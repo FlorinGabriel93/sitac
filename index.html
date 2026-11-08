@@ -1,0 +1,1335 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SITAC - Gazdac</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#c0392b">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<script>
+/* Aplicație instalabilă + offline (doar când e găzduită pe web, ex. GitHub Pages) */
+if('serviceWorker' in navigator && location.protocol === 'https:' && !(window.google && window.google.script)){
+  window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); });
+}
+</script>
+<style>
+  :root{
+    --bg:#e9ebee; --panel:#f7f8fa; --panel-2:#eef0f3; --border:#d3d8e0;
+    --text:#1f2530; --text-dim:#6b7480; --accent:#c0392b;
+    --blue:#2f6fb0; --blue-dim:#dce8f5; --green:#2e8b52; --amber:#b8860b;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;width:100%;height:100%;background:var(--bg);color:var(--text);font-family:'Segoe UI',Roboto,Arial,sans-serif;overflow:hidden;}
+  #app{display:flex;flex-direction:column;width:100vw;height:100vh;position:relative;}
+  #body-row{flex:1 1 auto;display:flex;min-height:0;}
+  header{flex:0 0 auto;min-height:52px;background:var(--panel);border-bottom:1px solid var(--border);display:flex;align-items:center;flex-wrap:wrap;padding:4px 16px;gap:10px 16px;}
+  header .title{font-weight:600;font-size:15px;letter-spacing:.3px;}
+  header .title small{display:block;font-weight:400;font-size:11px;color:var(--text-dim);letter-spacing:.5px;}
+  header input[type=text], header input[type=date], header input[type=time]{background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:5px 8px;font-size:12px;}
+  header .field{display:flex;flex-direction:column;gap:2px;}
+  header .field label{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;}
+  #file-actions{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+  .hdr-btn{background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:6px 10px;font-size:11px;cursor:pointer;}
+  .hdr-btn:hover{border-color:var(--blue);}
+  .hdr-btn.primary{background:var(--blue);color:#fff;border-color:var(--blue);}
+  .hdr-btn:disabled{opacity:.6;cursor:wait;}
+  #net-status{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-dim);padding:4px 8px;border:1px solid var(--border);border-radius:12px;background:var(--panel-2);white-space:nowrap;}
+  #net-status .dot{width:8px;height:8px;border-radius:50%;background:var(--green);}
+  #net-status.off .dot{background:var(--accent);}
+  #net-status .pend{color:var(--amber);font-weight:700;}
+  #palette{flex:0 0 220px;background:var(--panel);border-right:1px solid var(--border);overflow-y:auto;padding:12px;}
+  #palette h3{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--text-dim);margin:14px 0 8px;}
+  #palette h3:first-child{margin-top:0;}
+  .sticker{display:flex;align-items:center;gap:8px;padding:6px 8px;margin-bottom:6px;background:var(--panel-2);border:1px solid var(--border);border-radius:6px;cursor:grab;font-size:12px;user-select:none;}
+  .sticker:hover{border-color:var(--blue);}
+  .sticker.armed{background:var(--blue-dim);border-color:var(--blue);box-shadow:0 0 0 2px var(--blue) inset;}
+  .icon-wrap{width:30px;height:22px;flex:0 0 30px;display:flex;align-items:center;justify-content:center;}
+  .icon-wrap svg{width:100%;height:100%;overflow:visible;}
+  #wind-box{display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:4px 10px 4px 4px;font-size:11px;color:var(--text-dim);}
+  #compass-svg{flex:0 0 44px;}
+  .wind-info{display:flex;flex-direction:column;line-height:1.3;}
+  .wind-info .wind-speed{font-size:13px;font-weight:700;color:var(--text);}
+  .wind-info .wind-sub{font-size:10px;color:var(--text-dim);}
+  #legend-panel{position:absolute;z-index:700;top:60px;right:0;width:260px;background:var(--panel);border:1px solid var(--border);padding:10px 12px;display:none;box-shadow:0 4px 12px rgba(0,0,0,.25);}
+  #legend-panel.open{display:block;}
+  #legend-panel .leg-row{display:flex;align-items:center;gap:8px;font-size:11px;margin-bottom:6px;line-height:1.4;}
+  #legend-panel .sw{width:16px;height:16px;flex:0 0 16px;border-radius:3px;}
+  #map-wrap{flex:1 1 auto;position:relative;min-width:0;}
+  #map{position:absolute;inset:0;background:#cfd5dd;}
+  #map img{-webkit-user-drag:none;user-select:none;}
+  #resources{flex:0 0 260px;background:var(--panel);border-left:1px solid var(--border);overflow-y:auto;padding:12px;}
+  #search-box{position:absolute;z-index:600;top:10px;left:56px;width:280px;max-width:calc(100% - 260px);}
+  #search-box input{width:100%;background:rgba(20,26,36,.92);border:1px solid var(--border);color:#f0f2f5;border-radius:6px;padding:8px 34px 8px 12px;font-size:13px;}
+  #search-box .icon{position:absolute;right:10px;top:9px;color:var(--text-dim);font-size:14px;pointer-events:none;}
+  #search-results{margin-top:4px;background:var(--panel-2);border:1px solid var(--border);border-radius:6px;max-height:220px;overflow-y:auto;display:none;}
+  #search-results div{padding:7px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--border);}
+  #search-results div:last-child{border-bottom:none;}
+  #search-results div:hover{background:var(--blue-dim);}
+  #resources h3{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--text-dim);margin:0 0 8px;}
+  .count-row{display:flex;justify-content:space-between;align-items:center;padding:5px 8px;background:var(--panel-2);border:1px solid var(--border);border-radius:5px;margin-bottom:5px;font-size:12px;}
+  .count-row .n{font-weight:700;color:var(--blue);}
+  #placed-list{margin-top:14px;}
+  .placed-item{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;font-size:11px;border-bottom:1px solid var(--border);gap:6px;}
+  .placed-item .placed-info{display:flex;align-items:center;gap:6px;flex:1;}
+  .placed-item .provenienta-input{width:45px;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:3px;padding:2px 4px;font-size:10px;text-align:center;text-transform:uppercase;}
+  .placed-item .rm{cursor:pointer;color:var(--accent);font-weight:700;padding:0 4px;}
+  .empty-hint{color:var(--text-dim);font-size:11px;line-height:1.5;padding:8px;}
+  #victims{margin-top:18px;padding-top:14px;border-top:1px solid var(--border);}
+  #victims h3{display:flex;justify-content:space-between;align-items:center;}
+  #add-victim{background:var(--blue-dim);border:1px solid var(--blue);color:var(--text);border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer;}
+  #add-victim:hover{background:var(--blue);color:#fff;}
+  #victim-summary{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;}
+  .cod-chip{font-size:10px;font-weight:700;padding:3px 7px;border-radius:4px;}
+  .cod-rosu{background:#f8d7d3;color:#8f2a1e;}
+  .cod-galben{background:#f7ecc4;color:#7a5e05;}
+  .cod-verde{background:#d4ecdd;color:#1f6b3f;}
+  .cod-negru{background:#e3e5e9;color:#3a3f47;border:1px solid var(--border);}
+  table#victim-table{width:100%;border-collapse:collapse;font-size:11px;}
+  table#victim-table th{text-align:left;color:var(--text-dim);font-weight:500;padding:4px 2px;border-bottom:1px solid var(--border);}
+  table#victim-table td{padding:4px 2px;border-bottom:1px solid var(--border);}
+  table#victim-table select, table#victim-table input[type=time]{background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 3px;font-size:10px;width:100%;}
+  .v-rm{cursor:pointer;color:var(--accent);font-weight:700;padding:0 3px;}
+  .leaflet-div-icon{background:none;border:none;}
+  .map-badge{width:36px;height:26px;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 1px 3px rgba(0,0,0,.6));}
+  .map-badge svg{width:100%;height:100%;overflow:visible;}
+  .map-label{background:rgba(11,18,32,.85);color:#fff;font-size:9px;padding:1px 4px;border-radius:3px;white-space:nowrap;margin-top:2px;text-align:center;}
+  .drop-hint{position:absolute;z-index:500;bottom:28px;left:50%;transform:translateX(-50%);background:rgba(11,18,32,.9);border:1px solid var(--border);color:#e3e7ec;font-size:11px;padding:6px 12px;border-radius:6px;pointer-events:none;text-align:center;}
+  #event-toolbar{position:absolute;z-index:600;top:10px;right:10px;display:flex;gap:6px;flex-direction:column;align-items:flex-end;}
+  #event-toggle, #device-toggle{background:rgba(247,248,250,.95);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 12px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 1px 4px rgba(0,0,0,.15);}
+  #event-toggle.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  #device-toggle.active{background:var(--blue);color:#fff;border-color:var(--blue);}
+  #event-tools, #device-tools{display:none;flex-direction:column;gap:6px;background:rgba(247,248,250,.95);border:1px solid var(--border);border-radius:6px;padding:8px;box-shadow:0 1px 4px rgba(0,0,0,.15);width:180px;}
+  #event-tools.open, #device-tools.open{display:flex;}
+  .ev-hint, .dev-hint{font-size:10px;color:var(--text-dim);line-height:1.4;}
+  .ev-colors, .dev-colors{display:flex;gap:6px;}
+  .ev-color, .dev-color{width:18px;height:18px;border-radius:50%;cursor:pointer;border:2px solid transparent;}
+  .ev-color.sel, .dev-color.sel{border-color:var(--text);}
+  .ev-btn, .dev-btn{background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:5px 8px;font-size:11px;cursor:pointer;text-align:center;}
+  .ev-btn:hover, .dev-btn:hover{border-color:var(--blue);}
+  .ev-btn.primary{background:var(--blue);color:#fff;border-color:var(--blue);}
+  .event-tooltip{background:rgba(247,248,250,.95)!important;border:1px solid var(--border)!important;color:var(--text)!important;font-size:11px!important;font-weight:700!important;padding:2px 7px!important;border-radius:4px!important;box-shadow:0 1px 3px rgba(0,0,0,.2)!important;}
+  .event-tooltip::before{display:none!important;}
+  #credit{position:absolute;bottom:6px;left:8px;font-size:10px;color:var(--text-dim);opacity:.65;z-index:800;pointer-events:none;letter-spacing:.3px;}
+  .modal{position:absolute;inset:0;z-index:2000;background:rgba(20,26,36,.45);display:none;align-items:center;justify-content:center;}
+  .modal.open{display:flex;}
+  .m-box{background:var(--panel);border:1px solid var(--border);border-radius:8px;width:460px;max-width:94vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 8px 24px rgba(0,0,0,.3);}
+  .m-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border);font-weight:600;font-size:14px;}
+  .m-head .x{cursor:pointer;color:var(--text-dim);padding:0 4px;}
+  .m-body{overflow-y:auto;padding:10px 14px;font-size:12px;}
+  .m-body h4{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--text-dim);margin:12px 0 6px;}
+  .m-body h4:first-child{margin-top:0;}
+  .m-body label{display:block;font-size:11px;color:var(--text-dim);margin:8px 0 3px;}
+  .m-body input[type=text], .m-body input[type=password]{width:100%;background:var(--panel-2);border:1px solid var(--border);border-radius:4px;padding:7px 8px;font-size:12px;color:var(--text);}
+  .m-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
+  .m-note{font-size:11px;color:var(--text-dim);line-height:1.5;margin-top:6px;}
+  .lm-item{display:flex;justify-content:space-between;align-items:center;padding:8px 2px;font-size:12px;border-bottom:1px solid var(--border);gap:8px;}
+  .lm-item:hover{background:var(--blue-dim);}
+  .lm-item .lm-name{cursor:pointer;flex:1;word-break:break-all;}
+  .lm-item .lm-date{color:var(--text-dim);font-size:10px;white-space:nowrap;}
+  .lm-item .lm-del{cursor:pointer;color:var(--accent);font-weight:700;padding:0 4px;}
+  #toast{position:absolute;z-index:2100;bottom:20px;left:50%;transform:translateX(-50%);background:#1f2530;color:#fff;font-size:12px;padding:8px 14px;border-radius:6px;display:none;box-shadow:0 2px 8px rgba(0,0,0,.3);max-width:90vw;text-align:center;}
+  #boot-error{position:absolute;inset:0;z-index:3000;background:var(--bg);display:none;align-items:center;justify-content:center;padding:20px;}
+  #boot-error .m-box{padding:20px;font-size:13px;line-height:1.6;}
+  #body-row{position:relative;}
+  .mob-btn{display:none;}
+  /* ===== Telefon / tabletă mică ===== */
+  @media (max-width: 820px){
+    header{padding:6px 10px;gap:6px 8px;}
+    header .title small{display:none;}
+    header .field label{display:none;}
+    #ev-name{width:130px!important;}
+    #wind-box{padding:2px 8px 2px 2px;}
+    #compass-svg{width:34px;height:34px;flex-basis:34px;}
+    #file-actions{margin-left:0;width:100%;}
+    .hdr-btn{padding:8px 10px;font-size:12px;}
+    .mob-btn{display:inline-block;}
+    #palette,#resources{position:absolute;top:0;bottom:0;z-index:900;box-shadow:0 4px 16px rgba(0,0,0,.3);transition:transform .2s ease;}
+    #palette{left:0;width:250px;transform:translateX(-105%);}
+    #resources{right:0;width:290px;max-width:90vw;transform:translateX(105%);}
+    #palette.open,#resources.open{transform:none;}
+    #search-box{left:50px;width:auto;right:150px;max-width:none;}
+    #legend-panel{top:auto;bottom:0;}
+    .sticker{padding:9px 8px;}
+  }
+</style>
+
+<!-- Încărcare bibliotecă hartă: prima dată de pe internet, apoi din memoria locală (offline) -->
+<script>
+(function(){
+  var JS_URL  = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+  var CSS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+  var KJS = 'sitac_lib_leaflet_js_194', KCSS = 'sitac_lib_leaflet_css_194';
+  function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+  function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+  function inject(js, css){
+    var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+    var sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+  }
+  window.__leafletReady = new Promise(function(resolve, reject){
+    var js = lsGet(KJS), css = lsGet(KCSS);
+    if(js && css){ inject(js, css); return window.L ? resolve() : reject(new Error('cache')); }
+    Promise.all([fetch(JS_URL).then(function(r){ return r.text(); }), fetch(CSS_URL).then(function(r){ return r.text(); })])
+      .then(function(res){
+        lsSet(KJS, res[0]); lsSet(KCSS, res[1]);
+        inject(res[0], res[1]);
+        window.L ? resolve() : reject(new Error('load'));
+      })
+      .catch(reject);
+  });
+})();
+</script>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="title">SITAC <small>Gazdac · dispozitiv de intervenție</small></div>
+    <div class="field"><label>Eveniment</label><input type="text" id="ev-name" placeholder="denumire eveniment" style="width:170px"></div>
+    <div class="field"><label>Data</label><input type="date" id="ev-date"></div>
+    <div class="field"><label>Ora</label><input type="time" id="ev-time"></div>
+    <div id="wind-box">
+      <svg id="compass-svg" width="44" height="44" viewBox="0 0 54 54">
+        <circle cx="27" cy="27" r="24" fill="#f7f8fa" stroke="#c3c9d2" stroke-width="1.5"/>
+        <line x1="27" y1="5" x2="27" y2="10" stroke="#c3c9d2" stroke-width="1"/>
+        <line x1="27" y1="44" x2="27" y2="49" stroke="#c3c9d2" stroke-width="1"/>
+        <line x1="5" y1="27" x2="10" y2="27" stroke="#c3c9d2" stroke-width="1"/>
+        <line x1="44" y1="27" x2="49" y2="27" stroke="#c3c9d2" stroke-width="1"/>
+        <text x="27" y="12" text-anchor="middle" font-size="7" font-weight="700" fill="#6b7480">N</text>
+        <text x="42" y="30" text-anchor="middle" font-size="7" fill="#6b7480">E</text>
+        <text x="27" y="46.5" text-anchor="middle" font-size="7" fill="#6b7480">S</text>
+        <text x="12" y="30" text-anchor="middle" font-size="7" fill="#6b7480">V</text>
+        <g id="wind-needle">
+          <line x1="27" y1="27" x2="27" y2="10" stroke="#c0392b" stroke-width="2.4" stroke-linecap="round"/>
+          <polygon points="27,7 23.5,14 30.5,14" fill="#c0392b"/>
+          <line x1="27" y1="27" x2="27" y2="39" stroke="#8b93a0" stroke-width="1.6" stroke-linecap="round"/>
+          <circle cx="27" cy="27" r="2.4" fill="#8b93a0"/>
+        </g>
+      </svg>
+      <div class="wind-info">
+        <span class="wind-speed" id="wind-speed">-- km/h</span>
+        <span class="wind-sub" id="wind-sub">se încarcă...</span>
+      </div>
+    </div>
+    <div id="file-actions">
+      <button class="hdr-btn mob-btn" id="btn-pal">☰ Simboluri</button>
+      <button class="hdr-btn mob-btn" id="btn-res">Resurse</button>
+      <span id="net-status"><span class="dot"></span><span id="net-text">Online</span></span>
+      <button class="hdr-btn" id="btn-new">Nou</button>
+      <button class="hdr-btn" id="btn-open">Deschide</button>
+      <button class="hdr-btn primary" id="btn-save">Salvează în Drive</button>
+      <button class="hdr-btn" id="btn-settings" title="Setări Drive și hartă offline">⚙</button>
+      <button class="hdr-btn" id="legend-toggle">Legendă</button>
+    </div>
+  </header>
+  <div id="legend-panel"></div>
+
+  <div id="body-row">
+    <div id="palette"></div>
+
+    <div id="map-wrap">
+      <div id="map"></div>
+      <div id="search-box">
+        <input type="text" id="search-input" placeholder="Caută localitate sau adresă..." autocomplete="off">
+        <span class="icon">&#128269;</span>
+        <div id="search-results"></div>
+      </div>
+      <div class="drop-hint" id="hint">Trage un marcaj din stânga pe hartă — sau atinge-l, apoi atinge harta</div>
+
+      <div id="event-toolbar">
+        <div id="event-tools">
+          <div class="ev-hint">Click pe hartă pentru fiecare colț al zonei. Minim 3 puncte.</div>
+          <div class="ev-colors">
+            <span class="ev-color sel" data-color="#c0392b" style="background:#c0392b"></span>
+            <span class="ev-color" data-color="#2c2c2c" style="background:#2c2c2c"></span>
+            <span class="ev-color" data-color="#2f6fb0" style="background:#2f6fb0"></span>
+            <span class="ev-color" data-color="#d9731f" style="background:#d9731f"></span>
+            <span class="ev-color" data-color="#2e8b52" style="background:#2e8b52"></span>
+          </div>
+          <span class="ev-btn primary" id="event-finish">Finalizează zona</span>
+          <span class="ev-btn" id="event-cancel">Anulează conturul curent</span>
+          <span class="ev-btn" id="event-clear">Șterge toate zonele</span>
+        </div>
+        <button id="event-toggle">&#128681; Eveniment</button>
+
+        <div id="device-tools">
+          <div class="dev-hint">Click pe hartă: 1. Origine, 2. Destinație (săgeată).</div>
+          <div class="dev-colors">
+            <span class="dev-color sel" data-color="#c0392b" style="background:#c0392b"></span>
+            <span class="dev-color" data-color="#2c2c2c" style="background:#2c2c2c"></span>
+            <span class="dev-color" data-color="#2f6fb0" style="background:#2f6fb0"></span>
+            <span class="dev-color" data-color="#d9731f" style="background:#d9731f"></span>
+            <span class="dev-color" data-color="#2e8b52" style="background:#2e8b52"></span>
+          </div>
+          <span class="dev-btn" id="device-undo">Șterge ultima săgeată</span>
+          <span class="dev-btn" id="device-clear">Șterge toate săgețile</span>
+        </div>
+        <button id="device-toggle">&#10148; Dispozitiv</button>
+      </div>
+    </div>
+
+    <div id="resources">
+      <h3>Resurse plasate</h3>
+      <div id="counts"></div>
+      <div id="placed-list"></div>
+      <div id="victims">
+        <h3>Victime <button id="add-victim">+ Adaugă</button></h3>
+        <div id="victim-summary"></div>
+        <table id="victim-table">
+          <thead><tr><th>#</th><th>Cod</th><th>Sex</th><th>Ora</th><th></th></tr></thead>
+          <tbody id="victim-tbody"></tbody>
+        </table>
+        <div id="victim-empty" class="empty-hint">Nicio victimă înregistrată.</div>
+      </div>
+    </div>
+  </div>
+  <div id="credit">Gazdac</div>
+
+  <!-- Deschidere -->
+  <div class="modal" id="load-modal">
+    <div class="m-box">
+      <div class="m-head">Deschide situație <span class="x" data-close="load-modal">✕</span></div>
+      <div class="m-body">
+        <h4>Din Google Drive</h4>
+        <div id="lm-list"><div class="empty-hint">Se încarcă...</div></div>
+        <h4>Din fișier de pe dispozitiv</h4>
+        <div class="m-row">
+          <button class="hdr-btn" id="btn-import">Importă fișier .json</button>
+          <input type="file" id="import-file" accept=".json,application/json" style="display:none">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Setări -->
+  <div class="modal" id="settings-modal">
+    <div class="m-box">
+      <div class="m-head">Setări <span class="x" data-close="settings-modal">✕</span></div>
+      <div class="m-body">
+        <h4>Legătura cu Google Drive</h4>
+        <div id="cfg-url-wrap">
+          <label for="cfg-url">Adresa aplicației web (Apps Script, se termină în /exec)</label>
+          <input type="text" id="cfg-url" placeholder="https://script.google.com/macros/s/.../exec">
+        </div>
+        <div class="m-note" id="cfg-embedded-note" style="display:none">Aplicația rulează direct din Apps Script — e nevoie doar de cheia de acces.</div>
+        <label for="cfg-key">Cheia de acces (API_KEY din Code.gs)</label>
+        <input type="password" id="cfg-key" placeholder="parola setată în Code.gs">
+        <div class="m-row">
+          <button class="hdr-btn primary" id="cfg-save">Salvează setările</button>
+          <button class="hdr-btn" id="cfg-test">Testează legătura</button>
+        </div>
+        <div class="m-note" id="cfg-msg"></div>
+
+        <h4>Hartă offline</h4>
+        <div class="m-note">Zonele vizualizate cu internet rămân salvate pe dispozitiv și se afișează și fără semnal. Înainte de a pleca în teren, încadrează zona pe hartă și apasă butonul de mai jos.</div>
+        <div class="m-row">
+          <button class="hdr-btn primary" id="tiles-prefetch">Descarcă zona vizibilă</button>
+          <button class="hdr-btn" id="tiles-clear">Golește cache-ul hărții</button>
+        </div>
+        <div class="m-note" id="tiles-msg"></div>
+
+        <h4>Copie de siguranță</h4>
+        <div class="m-row">
+          <button class="hdr-btn" id="btn-export">Descarcă situația ca fișier .json</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+  <div id="boot-error"><div class="m-box">
+    <strong>Biblioteca hărții nu a putut fi încărcată.</strong><br>
+    La <strong>prima</strong> deschidere aplicația are nevoie de internet, ca să-și salveze componentele pe dispozitiv. După aceea funcționează și offline.<br><br>
+    Conectează-te la internet și reîncarcă pagina.
+  </div></div>
+</div>
+
+<script>
+window.__leafletReady.then(initApp).catch(function(){
+  document.getElementById('boot-error').style.display = 'flex';
+});
+
+function initApp(){
+/* ================= UTILITARE ================= */
+function lsGet(k, def){ try{ const v = localStorage.getItem(k); return v === null ? def : JSON.parse(v); }catch(e){ return def; } }
+function lsSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function toast(msg, ms = 3000){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.display = 'block';
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', ms);
+}
+document.querySelectorAll('[data-close]').forEach(x => x.addEventListener('click', () => document.getElementById(x.dataset.close).classList.remove('open')));
+document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if(e.target === m) m.classList.remove('open'); }));
+
+/* ================= CACHE PLĂCI HARTĂ (IndexedDB) ================= */
+const TileCache = (() => {
+  let dbp = null;
+  function db(){
+    if(!dbp) dbp = new Promise((res, rej) => {
+      try{
+        const r = indexedDB.open('sitac_tiles', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('t');
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+      }catch(e){ rej(e); }
+    });
+    return dbp;
+  }
+  function req(mode, fn){
+    return db().then(d => new Promise(res => {
+      try{
+        const q = fn(d.transaction('t', mode).objectStore('t'));
+        q.onsuccess = () => res(q.result); q.onerror = () => res(null);
+      }catch(e){ res(null); }
+    })).catch(() => null);
+  }
+  return {
+    get: k => req('readonly', s => s.get(k)),
+    put: (k, v) => req('readwrite', s => s.put(v, k)),
+    count: () => req('readonly', s => s.count()),
+    clear: () => req('readwrite', s => s.clear())
+  };
+})();
+
+async function loadTile(url){
+  const cached = await TileCache.get(url);
+  if(cached) return cached;
+  const r = await fetch(url);
+  if(!r.ok) throw new Error('HTTP ' + r.status);
+  const blob = await r.blob();
+  TileCache.put(url, blob);
+  return blob;
+}
+
+const CachedTileLayer = L.TileLayer.extend({
+  createTile(coords, done){
+    const tile = document.createElement('img');
+    tile.alt = ''; tile.setAttribute('role', 'presentation');
+    const url = this.getTileUrl(coords);
+    loadTile(url).then(blob => {
+      const ou = URL.createObjectURL(blob);
+      tile.onload = () => { URL.revokeObjectURL(ou); done(null, tile); };
+      tile.onerror = () => { URL.revokeObjectURL(ou); done(new Error('tile'), tile); };
+      tile.src = ou;
+    }).catch(() => {
+      // fallback: încărcare directă (fără cache), dacă există internet
+      if(navigator.onLine){
+        tile.onload = () => done(null, tile);
+        tile.onerror = e => done(e, tile);
+        tile.src = url;
+      }else{
+        done(new Error('offline'), tile);
+      }
+    });
+    return tile;
+  }
+});
+
+/* ================= HARTĂ ================= */
+const map = L.map('map', { zoomControl: true }).setView([47.2, 24.0], 8);
+const TILE_LAYERS = [
+  new CachedTileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri World Imagery', maxZoom: 19 }),
+  new CachedTileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri Boundaries & Places', maxZoom: 19 })
+];
+TILE_LAYERS.forEach(l => l.addTo(map));
+setTimeout(() => map.invalidateSize(), 150);
+window.addEventListener('resize', () => map.invalidateSize());
+
+/* ================= VÂNT ================= */
+const COMPASS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSV','SV','VSV','V','VNV','NV','NNV'];
+function degToCompass(deg){ return COMPASS[Math.round(deg / 22.5) % 16]; }
+let windPos = [47.1333, 24.5];
+async function fetchWind(){
+  const speedEl = document.getElementById('wind-speed');
+  const subEl = document.getElementById('wind-sub');
+  const needleEl = document.getElementById('wind-needle');
+  if(!navigator.onLine){
+    const last = lsGet('sitac_last_wind', null);
+    speedEl.textContent = last ? last.speed : '--';
+    subEl.textContent = last ? 'offline · ultima: ' + last.time : 'offline';
+    return;
+  }
+  try{
+    const url = 'https:' + '//api.open-meteo.com/v1/forecast?latitude=' + windPos[0] + '&longitude=' + windPos[1] + '&current=wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=kmh';
+    const c = (await (await fetch(url)).json()).current;
+    const speed = `${Math.round(c.wind_speed_10m)} km/h`;
+    speedEl.textContent = speed;
+    subEl.textContent = `din ${degToCompass(c.wind_direction_10m)} · rafale ${Math.round(c.wind_gusts_10m)}`;
+    needleEl.setAttribute('transform', `rotate(${c.wind_direction_10m} 27 27)`);
+    lsSet('sitac_last_wind', { speed, time: new Date().toLocaleTimeString('ro-RO', { hour:'2-digit', minute:'2-digit' }) });
+  }catch(err){
+    speedEl.textContent = '--'; subEl.textContent = 'indisponibil';
+  }
+}
+fetchWind();
+setInterval(fetchWind, 10 * 60 * 1000);
+
+/* ================= HAȘURI ZONE ================= */
+const svgNS = 'http://www.w3.org/2000/svg';
+L.svg().addTo(map);
+const svgRootEl = map.getPane('overlayPane').querySelector('svg');
+const hatchDefs = document.createElementNS(svgNS, 'defs');
+const EVENT_COLORS = ['#c0392b', '#2c2c2c', '#2f6fb0', '#d9731f', '#2e8b52'];
+EVENT_COLORS.forEach((color, i) => {
+  const pattern = document.createElementNS(svgNS, 'pattern');
+  pattern.setAttribute('id', 'hatch' + i);
+  pattern.setAttribute('width', '8'); pattern.setAttribute('height', '8');
+  pattern.setAttribute('patternTransform', 'rotate(45)');
+  pattern.setAttribute('patternUnits', 'userSpaceOnUse');
+  const line = document.createElementNS(svgNS, 'line');
+  line.setAttribute('x1','0'); line.setAttribute('y1','0'); line.setAttribute('x2','0'); line.setAttribute('y2','8');
+  line.setAttribute('stroke', color); line.setAttribute('stroke-width', '3.2');
+  pattern.appendChild(line);
+  hatchDefs.appendChild(pattern);
+});
+svgRootEl.insertBefore(hatchDefs, svgRootEl.firstChild);
+function hatchUrlFor(color){ return 'url(#hatch' + Math.max(0, EVENT_COLORS.indexOf(color)) + ')'; }
+
+/* ================= ZONE EVENIMENT ================= */
+let eventMode = false, eventColor = EVENT_COLORS[0], eventPoints = [], eventPreview = null, eventLayers = [];
+const eventToggleBtn = document.getElementById('event-toggle');
+const eventToolsEl = document.getElementById('event-tools');
+const eventColorEls = document.querySelectorAll('.ev-color');
+const mapWrapEl = document.getElementById('map-wrap');
+
+function startEventPreview(){
+  eventPreview = L.polygon(eventPoints, { color: eventColor, weight: 2, dashArray: '5,4', fillColor: hatchUrlFor(eventColor), fillOpacity: 0.55 }).addTo(map);
+}
+function updateEventPreview(){ if(eventPreview) eventPreview.setLatLngs(eventPoints); }
+function cancelEventZone(){
+  if(eventPreview){ map.removeLayer(eventPreview); eventPreview = null; }
+  eventPoints = [];
+}
+function createZone(points, color, label){
+  const poly = L.polygon(points, { color, weight: 2, fillColor: hatchUrlFor(color), fillOpacity: 0.55 }).addTo(map);
+  poly.sitac = { color, label: label || '' };
+  if(label) poly.bindTooltip(escapeHtml(label), { permanent: true, direction: 'center', className: 'event-tooltip' });
+  poly.on('click', e => {
+    if(eventMode || deviceMode || armedType) return;
+    L.DomEvent.stopPropagation(e);
+    if(confirm('Ștergi această zonă de eveniment?')){
+      map.removeLayer(poly);
+      eventLayers = eventLayers.filter(l => l !== poly);
+    }
+  });
+  eventLayers.push(poly);
+  return poly;
+}
+function finishEventZone(){
+  if(eventPoints.length < 3){ cancelEventZone(); return; }
+  const pts = eventPoints.slice(), color = eventColor;
+  cancelEventZone();
+  const label = prompt('Denumire eveniment / obiectiv (opțional):', '');
+  createZone(pts, color, label);
+}
+eventToggleBtn.addEventListener('click', () => {
+  eventMode = !eventMode;
+  if(eventMode){ if(deviceMode) setDeviceMode(false); disarm(); }
+  eventToggleBtn.classList.toggle('active', eventMode);
+  eventToolsEl.classList.toggle('open', eventMode);
+  if(!eventMode) cancelEventZone();
+  updateMapInteraction();
+});
+eventColorEls.forEach(sw => sw.addEventListener('click', () => {
+  eventColor = sw.dataset.color;
+  eventColorEls.forEach(s => s.classList.remove('sel'));
+  sw.classList.add('sel');
+  if(eventPreview) eventPreview.setStyle({ color: eventColor, fillColor: hatchUrlFor(eventColor) });
+}));
+document.getElementById('event-finish').addEventListener('click', finishEventZone);
+document.getElementById('event-cancel').addEventListener('click', cancelEventZone);
+document.getElementById('event-clear').addEventListener('click', () => {
+  if(eventLayers.length && !confirm('Ștergi toate zonele?')) return;
+  eventLayers.forEach(l => map.removeLayer(l)); eventLayers = []; cancelEventZone();
+});
+
+/* ================= SĂGEȚI DISPOZITIV ================= */
+let deviceMode = false, deviceColor = EVENT_COLORS[0], deviceStartPoint = null, deviceLayers = [];
+const deviceToggleBtn = document.getElementById('device-toggle');
+const deviceToolsEl = document.getElementById('device-tools');
+const deviceColorEls = document.querySelectorAll('.dev-color');
+
+function setDeviceMode(on){
+  deviceMode = on;
+  deviceToggleBtn.classList.toggle('active', on);
+  deviceToolsEl.classList.toggle('open', on);
+  if(!on) deviceStartPoint = null;
+  updateMapInteraction();
+}
+function updateMapInteraction(){
+  const drawing = eventMode || deviceMode;
+  if(drawing){ map.dragging.disable(); map.doubleClickZoom.disable(); mapWrapEl.style.cursor = 'crosshair'; }
+  else { map.dragging.enable(); map.doubleClickZoom.enable(); mapWrapEl.style.cursor = armedType ? 'copy' : ''; }
+}
+deviceToggleBtn.addEventListener('click', () => {
+  const on = !deviceMode;
+  if(on){
+    disarm();
+    if(eventMode){ eventMode = false; eventToggleBtn.classList.remove('active'); eventToolsEl.classList.remove('open'); cancelEventZone(); }
+  }
+  setDeviceMode(on);
+});
+deviceColorEls.forEach(sw => sw.addEventListener('click', () => {
+  deviceColor = sw.dataset.color;
+  deviceColorEls.forEach(s => s.classList.remove('sel'));
+  sw.classList.add('sel');
+}));
+function removeArrow(g){ map.removeLayer(g.line); map.removeLayer(g.marker); }
+document.getElementById('device-clear').addEventListener('click', () => {
+  if(deviceLayers.length && !confirm('Ștergi toate săgețile?')) return;
+  deviceLayers.forEach(removeArrow); deviceLayers = []; deviceStartPoint = null;
+});
+document.getElementById('device-undo').addEventListener('click', () => {
+  if(deviceLayers.length) removeArrow(deviceLayers.pop());
+  else deviceStartPoint = null;
+});
+function arrowIcon(angle, color){
+  return L.divIcon({
+    className: '',
+    html: `<svg width="1" height="1" style="overflow:visible;display:block;"><g transform="rotate(${angle})"><path d="M0,0 L-16,-7 L-16,7 Z" fill="${color}"/></g></svg>`,
+    iconSize: [0, 0], iconAnchor: [0, 0]
+  });
+}
+function drawArrow(latlng1, latlng2, color){
+  const from = L.latLng(latlng1), to = L.latLng(latlng2);
+  const line = L.polyline([from, to], { color, weight: 4 }).addTo(map);
+  const p1 = map.latLngToContainerPoint(from), p2 = map.latLngToContainerPoint(to);
+  const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI;
+  const marker = L.marker(to, { icon: arrowIcon(angle, color), interactive: false }).addTo(map);
+  const group = { line, marker, color, from, to };
+  deviceLayers.push(group);
+  line.on('click', e => {
+    if(eventMode || deviceMode || armedType) return;
+    L.DomEvent.stopPropagation(e);
+    if(confirm('Ștergi această săgeată?')){
+      removeArrow(group);
+      deviceLayers = deviceLayers.filter(g => g !== group);
+    }
+  });
+}
+
+/* ================= SIMBOLURI ================= */
+const COLORS = {
+  rosu:{hex:'#c0392b',label:'Roșu',desc:'incendiu, fum, gaze fierbinți, explozii, fenomene termice'},
+  verde:{hex:'#2e8b52',label:'Verde',desc:'persoane — victime, implicați, populație'},
+  albastru:{hex:'#2f6fb0',label:'Albastru',desc:'apă — alimentare (hidranți, surse) sau inundații'},
+  portocaliu:{hex:'#d9731f',label:'Portocaliu',desc:'CBRN și riscuri tehnologice (electricitate, gaz, fluide)'},
+  violet:{hex:'#6a4fb0',label:'Violet',desc:'sistem de comandă, organizare zonă intervenție, logistică'},
+  negru:{hex:'#2c2c2c',label:'Negru',desc:'definirea zonei de intervenție (clădiri, instalații, căi de acces)'}
+};
+function truckBody(fill, accent){
+  return `<svg viewBox="0 0 44 26"><g>
+    <rect x="1" y="10" width="24" height="9" rx="1" fill="${fill}"/>
+    <path d="M25 10 h9 l6 6 v3 h-15 z" fill="${fill}"/>
+    <rect x="5" y="4" width="9" height="7" rx="1" fill="${fill}"/>
+    <rect x="6" y="5" width="3.5" height="3" fill="#cfe3f5" opacity="0.85"/>
+    <rect x="27" y="12" width="7" height="4" fill="#cfe3f5" opacity="0.55"/>
+    ${accent||''}
+    <circle cx="10" cy="20" r="3.2" fill="#1a1a1a"/><circle cx="10" cy="20" r="1.3" fill="#666"/>
+    <circle cx="22" cy="20" r="3.2" fill="#1a1a1a"/><circle cx="22" cy="20" r="1.3" fill="#666"/>
+    <circle cx="34" cy="20" r="3.2" fill="#1a1a1a"/><circle cx="34" cy="20" r="1.3" fill="#666"/>
+  </g></svg>`;
+}
+function ambulanceBody(fill){
+  return `<svg viewBox="0 0 44 26"><g>
+    <rect x="3" y="8" width="32" height="11" rx="2" fill="${fill}"/>
+    <rect x="7" y="5" width="10" height="6" rx="1" fill="${fill}"/>
+    <rect x="8" y="6" width="4" height="3" fill="#cfe3f5" opacity="0.85"/>
+    <rect x="21" y="10" width="7" height="1.6" fill="#fff"/>
+    <rect x="23.7" y="7.5" width="1.6" height="7" fill="#fff"/>
+    <circle cx="12" cy="20" r="3.2" fill="#1a1a1a"/><circle cx="12" cy="20" r="1.3" fill="#666"/>
+    <circle cx="29" cy="20" r="3.2" fill="#1a1a1a"/><circle cx="29" cy="20" r="1.3" fill="#666"/>
+  </g></svg>`;
+}
+function ladderTruck(fill){
+  return `<svg viewBox="0 0 44 26"><g>
+    <line x1="6" y1="6" x2="40" y2="6" stroke="${fill}" stroke-width="1.6"/>
+    <line x1="10" y1="2" x2="34" y2="6" stroke="${fill}" stroke-width="1.6"/>
+    ${truckBody(fill).replace('<svg viewBox="0 0 44 26">','').replace('</svg>','')}
+  </g></svg>`;
+}
+function tankerBody(fill){
+  return `<svg viewBox="0 0 44 26"><g>
+    <rect x="3" y="8" width="30" height="10" rx="5" fill="${fill}"/>
+    <rect x="33" y="10" width="7" height="8" fill="${fill}"/>
+    <rect x="6" y="4" width="8" height="6" rx="1" fill="${fill}"/>
+    <circle cx="12" cy="20" r="3" fill="#1a1a1a"/><circle cx="12" cy="20" r="1.2" fill="#666"/>
+    <circle cx="27" cy="20" r="3" fill="#1a1a1a"/><circle cx="27" cy="20" r="1.2" fill="#666"/>
+    <circle cx="37" cy="20" r="3" fill="#1a1a1a"/><circle cx="37" cy="20" r="1.2" fill="#666"/>
+  </g></svg>`;
+}
+function craneBody(fill){
+  return `<svg viewBox="0 0 44 26"><g>
+    <rect x="4" y="12" width="16" height="7" fill="${fill}"/>
+    <rect x="6" y="6" width="7" height="6" fill="${fill}"/>
+    <line x1="18" y1="12" x2="40" y2="2" stroke="${fill}" stroke-width="2.4"/>
+    <line x1="40" y1="2" x2="40" y2="9" stroke="#888" stroke-width="1"/>
+    <circle cx="10" cy="20" r="3" fill="#1a1a1a"/><circle cx="10" cy="20" r="1.2" fill="#666"/>
+    <circle cx="18" cy="20" r="3" fill="#1a1a1a"/><circle cx="18" cy="20" r="1.2" fill="#666"/>
+  </g></svg>`;
+}
+function excavatorBody(fill){
+  return `<svg viewBox="0 0 44 26"><g>
+    <rect x="4" y="20" width="22" height="3" fill="#1a1a1a"/>
+    <rect x="6" y="12" width="16" height="8" rx="1" fill="${fill}"/>
+    <rect x="9" y="7" width="8" height="6" rx="1" fill="${fill}"/>
+    <line x1="17" y1="10" x2="34" y2="4" stroke="${fill}" stroke-width="2.2"/>
+    <path d="M34 4 l6 3 l-3 4 z" fill="${fill}"/>
+  </g></svg>`;
+}
+function pumpBody(fill){
+  return `<svg viewBox="0 0 44 26"><g>
+    <rect x="10" y="10" width="16" height="9" rx="1" fill="${fill}"/>
+    <circle cx="18" cy="14.5" r="2.6" fill="#cfe3f5" opacity="0.8"/>
+    <line x1="26" y1="14" x2="34" y2="14" stroke="${fill}" stroke-width="2"/>
+    <circle cx="15" cy="20" r="2.6" fill="#1a1a1a"/><circle cx="21" cy="20" r="2.6" fill="#1a1a1a"/>
+  </g></svg>`;
+}
+function heliBody(fill){
+  return `<svg viewBox="0 0 44 26"><g>
+    <line x1="2" y1="6" x2="42" y2="6" stroke="#888" stroke-width="1.4"/>
+    <ellipse cx="18" cy="14" rx="13" ry="6" fill="${fill}"/>
+    <rect x="29" y="12" width="12" height="3" fill="${fill}"/>
+    <line x1="41" y1="8" x2="41" y2="18" stroke="#888" stroke-width="1.2"/>
+    <circle cx="14" cy="13" r="2.6" fill="#cfe3f5" opacity="0.85"/>
+  </g></svg>`;
+}
+function boatBody(fill){
+  return `<svg viewBox="0 0 44 26"><g>
+    <path d="M4 16 h30 l-5 6 h-20 z" fill="${fill}"/>
+    <rect x="16" y="9" width="9" height="7" fill="${fill}"/>
+    <line x1="20" y1="4" x2="20" y2="9" stroke="#888" stroke-width="1.4"/>
+  </g></svg>`;
+}
+function vanBody(fill, accent){
+  return `<svg viewBox="0 0 44 26"><g>
+    <rect x="4" y="8" width="30" height="11" rx="2" fill="${fill}"/>
+    <rect x="8" y="5" width="8" height="6" rx="1" fill="${fill}"/>
+    <rect x="9" y="6" width="3.5" height="3" fill="#cfe3f5" opacity="0.85"/>
+    ${accent||''}
+    <circle cx="13" cy="20" r="3" fill="#1a1a1a"/><circle cx="13" cy="20" r="1.2" fill="#666"/>
+    <circle cx="28" cy="20" r="3" fill="#1a1a1a"/><circle cx="28" cy="20" r="1.2" fill="#666"/>
+  </g></svg>`;
+}
+function motoBody(fill){
+  return `<svg viewBox="0 0 44 26"><g>
+    <circle cx="12" cy="19" r="4" fill="none" stroke="${fill}" stroke-width="2"/>
+    <circle cx="30" cy="19" r="4" fill="none" stroke="${fill}" stroke-width="2"/>
+    <path d="M12 19 L20 10 H30 L30 19" fill="none" stroke="${fill}" stroke-width="2"/>
+    <rect x="18" y="8" width="6" height="3" fill="${fill}"/>
+  </g></svg>`;
+}
+function flagSymbol(fill){
+  return `<svg viewBox="0 0 44 26"><g>
+    <line x1="14" y1="3" x2="14" y2="23" stroke="${fill}" stroke-width="2.2"/>
+    <path d="M14 4 h20 l-5 5 l5 5 h-20 z" fill="none" stroke="${fill}" stroke-width="2"/>
+  </g></svg>`;
+}
+function blockSymbol(fill){ return `<svg viewBox="0 0 44 26"><rect x="4" y="4" width="36" height="18" rx="1" fill="${fill}"/></svg>`; }
+function medicalSymbol(fill, crossColor){
+  return `<svg viewBox="0 0 44 26"><g>
+    <rect x="8" y="3" width="28" height="20" rx="2" fill="${fill}"/>
+    <rect x="19" y="7" width="6" height="12" fill="${crossColor}"/>
+    <rect x="14" y="12" width="16" height="6" fill="${crossColor}"/>
+  </g></svg>`;
+}
+function psiSymbol(fill){
+  return `<svg viewBox="0 0 44 26"><g>
+    <circle cx="22" cy="13" r="11" fill="none" stroke="${fill}" stroke-width="2"/>
+    <text x="22" y="19" font-size="15" text-anchor="middle" fill="${fill}" font-family="Georgia,serif">&#968;</text>
+  </g></svg>`;
+}
+function genericSymbol(fill){
+  return `<svg viewBox="0 0 44 26"><g>
+    <rect x="10" y="3" width="24" height="20" rx="4" fill="${fill}"/>
+    <line x1="22" y1="8" x2="22" y2="18" stroke="#fff" stroke-width="2.6"/>
+    <line x1="17" y1="13" x2="27" y2="13" stroke="#fff" stroke-width="2.6"/>
+  </g></svg>`;
+}
+function policeVan(fill){
+  return `<svg viewBox="0 0 44 26"><g>
+    <rect x="4" y="8" width="30" height="11" rx="2" fill="${fill}"/>
+    <rect x="8" y="5" width="8" height="6" rx="1" fill="${fill}"/>
+    <rect x="9" y="6" width="3.5" height="3" fill="#cfe3f5" opacity="0.85"/>
+    <rect x="4" y="11.5" width="30" height="2" fill="#fff" opacity="0.9"/>
+    <rect x="15" y="4.5" width="8" height="2.2" fill="#e5b400"/>
+    <circle cx="13" cy="20" r="3" fill="#1a1a1a"/><circle cx="13" cy="20" r="1.2" fill="#666"/>
+    <circle cx="28" cy="20" r="3" fill="#1a1a1a"/><circle cx="28" cy="20" r="1.2" fill="#666"/>
+  </g></svg>`;
+}
+
+const VEHICLES = [
+  { type:'ASAS', label:'Autospecială stingere apă-spumă', kind:'firetruck' },
+  { type:'ADesc', label:'Autospecială descarcerare', kind:'firetruck' },
+  { type:'ASISI', label:'Autospecială salvare înălțime', kind:'ladder' },
+  { type:'ACI', label:'Autospecială accidente colective/calamități', kind:'firetruck' },
+  { type:'TIM', label:'Unitate mobilă terapie intensivă', kind:'ambulance' },
+  { type:'EPA', label:'Autoambulanță Tip B', kind:'ambulance' },
+  { type:'AC', label:'Autocisternă transport apă', kind:'tanker' },
+  { type:'PAT', label:'Autocamion transport efective/materiale', kind:'truckplain' },
+  { type:'CBRN', label:'Autospecială CBRN', kind:'van' },
+  { type:'PC', label:'Autospecială punct de comandă mobil', kind:'truckplain' },
+  { type:'MAC', label:'Macara ISU', kind:'crane' },
+  { type:'EXC', label:'Autoexcavator/buldo-excavator ISU', kind:'excavator' },
+  { type:'MP', label:'Motopompă', kind:'pump' },
+  { type:'HELI', label:'Echipaj salvare aeriană', kind:'heli' },
+  { type:'BARCA', label:'Barcă salvare cu motor', kind:'boat' },
+  { type:'SCAF', label:'Autospecială scafandri', kind:'van' },
+  { type:'MOTO', label:'Motocicletă intervenție urbană', kind:'moto' }
+];
+const POINTS = [
+  { type:'POA', label:'Punct operativ avansat', kind:'flag', color:'violet' },
+  { type:'PRM', label:'Punct regrupare mijloace', kind:'block', color:'violet' },
+  { type:'LOG', label:'Bază logistică în teren', kind:'block', color:'violet' },
+  { type:'PRV', label:'Punct regrupare victime', kind:'medical', color:'verde' },
+  { type:'PMA', label:'Post medical avansat', kind:'medical', color:'verde' },
+  { type:'CAI', label:'Centrul asistență implicați', kind:'psi', color:'verde' }
+];
+const CMD = [ { type:'COS', label:'Comandant intervenție/acțiune', kind:'block', color:'violet' } ];
+const OTHER_AGENCIES = [
+  { type:'POLITIE', tag:'POLIȚIE', label:'Autospecială Poliție', kind:'policevan', hex:'#1c4fa0' },
+  { type:'JANDARM', tag:'JANDARMERIE', label:'Autospecială Jandarmerie', kind:'policevan', hex:'#2e5c3e' },
+  { type:'ALTE', tag:'ALTE MIJLOACE', label:'Alte mijloace', kind:'generic', hex:'#6b7480' }
+];
+function iconMarkup(kind, color){
+  switch(kind){
+    case 'firetruck': case 'truckplain': return truckBody(color);
+    case 'ladder': return ladderTruck(color);
+    case 'ambulance': return ambulanceBody(color);
+    case 'tanker': return tankerBody(color);
+    case 'van': return vanBody(color, `<rect x="20" y="12" width="10" height="3" fill="#fff" opacity="0.85"/>`);
+    case 'crane': return craneBody(color);
+    case 'excavator': return excavatorBody(color);
+    case 'pump': return pumpBody(color);
+    case 'heli': return heliBody(color);
+    case 'boat': return boatBody(color);
+    case 'moto': return motoBody(color);
+    case 'flag': return flagSymbol(color);
+    case 'medical': return medicalSymbol(color, '#c0392b');
+    case 'psi': return psiSymbol(color);
+    case 'policevan': return policeVan(color);
+    case 'generic': return genericSymbol(color);
+    default: return blockSymbol(color);
+  }
+}
+const ITEMS_BY_TYPE = {};
+VEHICLES.forEach(v => ITEMS_BY_TYPE[v.type] = { ...v, colorHex: COLORS.rosu.hex });
+POINTS.forEach(p => ITEMS_BY_TYPE[p.type] = { ...p, colorHex: COLORS[p.color].hex });
+CMD.forEach(c => ITEMS_BY_TYPE[c.type] = { ...c, colorHex: COLORS[c.color].hex });
+OTHER_AGENCIES.forEach(o => ITEMS_BY_TYPE[o.type] = { ...o, colorHex: o.hex });
+const ICON_SVG_CACHE = {};
+Object.values(ITEMS_BY_TYPE).forEach(it => { ICON_SVG_CACHE[it.type] = iconMarkup(it.kind, it.colorHex); });
+function iconHTML(type){ return ICON_SVG_CACHE[type] || blockSymbol('#888'); }
+
+/* ================= PALETĂ (trage sau atinge) ================= */
+let armedType = null;
+const hintEl = document.getElementById('hint');
+const HINT_DEFAULT = hintEl.textContent;
+function disarm(){
+  armedType = null;
+  document.querySelectorAll('.sticker.armed').forEach(s => s.classList.remove('armed'));
+  hintEl.textContent = HINT_DEFAULT;
+  hintEl.style.display = placed.length ? 'none' : '';
+  updateMapInteraction();
+}
+function arm(type){
+  if(eventMode) eventToggleBtn.click();
+  if(deviceMode) setDeviceMode(false);
+  armedType = type;
+  document.getElementById('palette').classList.remove('open');
+  document.querySelectorAll('.sticker').forEach(s => s.classList.toggle('armed', s.dataset.type === type));
+  hintEl.textContent = `Atinge harta pentru a plasa ${type}. Atinge din nou simbolul (sau Esc) pentru a opri.`;
+  hintEl.style.display = '';
+  updateMapInteraction();
+}
+function renderPalette(){
+  const el = document.getElementById('palette');
+  const section = (title, items) => `<h3>${title}</h3>` + items.map(it => `
+      <div class="sticker" draggable="true" data-type="${it.type}">
+        <span class="icon-wrap">${iconHTML(it.type)}</span><span>${it.label}</span>
+      </div>`).join('');
+  el.innerHTML = section('Autospeciale', VEHICLES) + section('Puncte operative', POINTS) + section('Comandă', CMD) + section('Alte structuri', OTHER_AGENCIES);
+  el.querySelectorAll('.sticker').forEach(node => {
+    node.addEventListener('dragstart', e => e.dataTransfer.setData('text/plain', node.dataset.type));
+    node.addEventListener('click', () => armedType === node.dataset.type ? disarm() : arm(node.dataset.type));
+  });
+}
+document.addEventListener('keydown', e => { if(e.key === 'Escape' && armedType) disarm(); });
+
+document.getElementById('legend-panel').innerHTML = Object.values(COLORS).map(c => `
+  <div class="leg-row"><span class="sw" style="background:${c.hex}"></span><span><strong>${c.label}</strong> — ${c.desc}</span></div>`).join('');
+document.getElementById('legend-toggle').addEventListener('click', () => document.getElementById('legend-panel').classList.toggle('open'));
+
+/* ================= CLICK PE HARTĂ ================= */
+map.on('click', e => {
+  if(eventMode){
+    eventPoints.push(e.latlng);
+    if(eventPoints.length === 1) startEventPreview(); else updateEventPreview();
+    return;
+  }
+  if(deviceMode){
+    if(!deviceStartPoint) deviceStartPoint = e.latlng;
+    else { drawArrow(deviceStartPoint, e.latlng, deviceColor); deviceStartPoint = null; }
+    return;
+  }
+  if(armedType) addMarker(armedType, e.latlng);
+});
+
+/* ================= CĂUTARE ================= */
+let searchTimer = null, searchMarker = null;
+const searchInput = document.getElementById('search-input');
+const searchResults = document.getElementById('search-results');
+searchInput.addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  const q = searchInput.value.trim();
+  if(q.length < 3){ searchResults.style.display = 'none'; return; }
+  searchTimer = setTimeout(() => runSearch(q), 400);
+});
+async function runSearch(q){
+  if(!navigator.onLine){
+    searchResults.innerHTML = '<div style="color:var(--text-dim);cursor:default;">Căutarea necesită internet</div>';
+    searchResults.style.display = 'block'; return;
+  }
+  try{
+    const res = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=6&q=' + encodeURIComponent(q), { headers: { 'Accept': 'application/json' } });
+    const data = await res.json();
+    if(!data.length){
+      searchResults.innerHTML = '<div style="color:var(--text-dim);cursor:default;">Niciun rezultat</div>';
+      searchResults.style.display = 'block'; return;
+    }
+    searchResults.innerHTML = '';
+    data.forEach(r => {
+      const d = document.createElement('div');
+      d.textContent = r.display_name;
+      d.addEventListener('click', () => {
+        const lat = parseFloat(r.lat), lon = parseFloat(r.lon);
+        map.setView([lat, lon], 16);
+        if(searchMarker) map.removeLayer(searchMarker);
+        searchMarker = L.marker([lat, lon]).addTo(map);
+        searchResults.style.display = 'none';
+        searchInput.value = r.display_name;
+        windPos = [lat, lon]; fetchWind();
+      });
+      searchResults.appendChild(d);
+    });
+    searchResults.style.display = 'block';
+  }catch(err){
+    searchResults.innerHTML = '<div style="color:var(--accent);cursor:default;">Eroare la căutare</div>';
+    searchResults.style.display = 'block';
+  }
+}
+document.addEventListener('click', e => { if(!e.target.closest('#search-box')) searchResults.style.display = 'none'; });
+
+/* ================= VICTIME ================= */
+let victims = [], victimIdCounter = 1;
+const CODES = [
+  { key:'rosu', label:'Roșu', cls:'cod-rosu' }, { key:'galben', label:'Galben', cls:'cod-galben' },
+  { key:'verde', label:'Verde', cls:'cod-verde' }, { key:'negru', label:'Negru', cls:'cod-negru' }
+];
+const SEXES = [ ['?', '?'], ['F', 'F'], ['M', 'M'] ];
+function nowHHMM(){ const d = new Date(); return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); }
+function addVictim(){ victims.push({ id: victimIdCounter++, cod:'verde', sex:'?', ora: nowHHMM() }); renderVictims(); }
+function removeVictim(id){ victims = victims.filter(v => v.id !== id); renderVictims(); }
+function renderVictims(){
+  const summaryEl = document.getElementById('victim-summary');
+  const tbody = document.getElementById('victim-tbody');
+  const table = document.getElementById('victim-table');
+  const emptyEl = document.getElementById('victim-empty');
+  const counts = { rosu:0, galben:0, verde:0, negru:0 };
+  victims.forEach(v => { if(counts[v.cod] !== undefined) counts[v.cod]++; });
+  summaryEl.innerHTML = CODES.map(c => `<span class="cod-chip ${c.cls}">${c.label} ${counts[c.key]}</span>`).join('')
+    + `<span class="cod-chip" style="background:var(--panel-2);color:var(--text)">Total ${victims.length}</span>`;
+  if(!victims.length){ table.style.display = 'none'; emptyEl.style.display = 'block'; tbody.innerHTML = ''; return; }
+  table.style.display = 'table'; emptyEl.style.display = 'none';
+  tbody.innerHTML = victims.map((v, i) => `
+    <tr data-id="${v.id}">
+      <td>${i+1}</td>
+      <td><select class="v-cod">${CODES.map(c => `<option value="${c.key}" ${v.cod===c.key?'selected':''}>${c.label}</option>`).join('')}</select></td>
+      <td><select class="v-sex">${SEXES.map(([k,l]) => `<option value="${k}" ${v.sex===k?'selected':''}>${l}</option>`).join('')}</select></td>
+      <td><input type="time" class="v-ora" value="${escapeHtml(v.ora || '')}"></td>
+      <td><span class="v-rm">✕</span></td>
+    </tr>`).join('');
+  tbody.querySelectorAll('tr').forEach(row => {
+    const id = Number(row.dataset.id);
+    const v = victims.find(x => x.id === id);
+    row.querySelector('.v-cod').addEventListener('change', e => { v.cod = e.target.value; renderVictims(); });
+    row.querySelector('.v-sex').addEventListener('change', e => { v.sex = e.target.value; });
+    row.querySelector('.v-ora').addEventListener('change', e => { v.ora = e.target.value; });
+    row.querySelector('.v-rm').addEventListener('click', () => removeVictim(id));
+  });
+}
+document.getElementById('add-victim').addEventListener('click', addVictim);
+
+/* ================= MARCAJE ================= */
+let placed = [], idCounter = 1;
+function makeIcon(type, provenienta = ''){
+  const item = ITEMS_BY_TYPE[type] || { type };
+  const provText = provenienta ? ` (${escapeHtml(provenienta)})` : '';
+  return L.divIcon({
+    className: '',
+    html: `<div style="display:flex;flex-direction:column;align-items:center;">
+             <div class="map-badge">${iconHTML(type)}</div>
+             <div class="map-label">${item.tag || type}${provText}</div>
+           </div>`,
+    iconSize: [36, 42], iconAnchor: [18, 13]
+  });
+}
+function addMarker(type, latlng, provenienta = ''){
+  if(!ITEMS_BY_TYPE[type]) return;
+  const id = idCounter++;
+  const marker = L.marker(latlng, { icon: makeIcon(type, provenienta), draggable: true }).addTo(map);
+  marker.on('dblclick', () => {
+    map.removeLayer(marker);
+    placed = placed.filter(p => p.id !== id);
+    render();
+  });
+  placed.push({ id, type, provenienta, marker });
+  render();
+  if(!armedType) hintEl.style.display = 'none';
+}
+function render(){
+  const counts = {};
+  placed.forEach(p => counts[p.type] = (counts[p.type]||0) + 1);
+  document.getElementById('counts').innerHTML = Object.keys(counts).length
+    ? Object.entries(counts).map(([t,n]) => `<div class="count-row"><span>${t}</span><span class="n">${n}</span></div>`).join('')
+    : '<div class="empty-hint">Niciun element plasat încă.</div>';
+  const listEl = document.getElementById('placed-list');
+  listEl.innerHTML = placed.length
+    ? '<h3>Listă</h3>' + placed.map(p => `
+        <div class="placed-item" data-id="${p.id}">
+          <div class="placed-info"><span>${p.type} #${p.id}</span>
+            <input type="text" class="provenienta-input" maxlength="4" value="${escapeHtml(p.provenienta)}" placeholder="ISU"></div>
+          <span class="rm">✕</span>
+        </div>`).join('')
+    : '<div class="empty-hint">Dublu-click pe un marcaj de pe hartă pentru a-l șterge, sau folosește lista de aici după plasare.</div>';
+  listEl.querySelectorAll('.placed-item').forEach(row => {
+    const id = Number(row.dataset.id);
+    const item = placed.find(p => p.id === id);
+    row.querySelector('.provenienta-input').addEventListener('input', e => {
+      item.provenienta = e.target.value;
+      item.marker.setIcon(makeIcon(item.type, item.provenienta));
+    });
+    row.querySelector('.rm').addEventListener('click', () => {
+      map.removeLayer(item.marker);
+      placed = placed.filter(p => p.id !== id);
+      render();
+    });
+  });
+}
+const mapContainer = document.getElementById('map');
+mapContainer.addEventListener('dragover', e => e.preventDefault());
+mapContainer.addEventListener('drop', e => {
+  e.preventDefault();
+  const type = e.dataTransfer.getData('text/plain');
+  const rect = mapContainer.getBoundingClientRect();
+  addMarker(type, map.containerPointToLatLng(L.point(e.clientX - rect.left, e.clientY - rect.top)));
+});
+
+/* ================= STARE: SERIALIZARE / RESTAURARE ================= */
+function hasContent(){ return placed.length || eventLayers.length || deviceLayers.length || victims.length; }
+function serialize(){
+  const c = map.getCenter();
+  return JSON.stringify({
+    v: 1, app: 'SITAC-Gazdac', saved: new Date().toISOString(),
+    ev: { name: document.getElementById('ev-name').value, date: document.getElementById('ev-date').value, time: document.getElementById('ev-time').value },
+    view: { lat: c.lat, lng: c.lng, zoom: map.getZoom() },
+    placed: placed.map(p => { const ll = p.marker.getLatLng(); return { type: p.type, prov: p.provenienta, lat: ll.lat, lng: ll.lng }; }),
+    zones: eventLayers.map(z => ({ color: z.sitac.color, label: z.sitac.label, pts: z.getLatLngs()[0].map(ll => [ll.lat, ll.lng]) })),
+    arrows: deviceLayers.map(g => ({ color: g.color, from: [g.from.lat, g.from.lng], to: [g.to.lat, g.to.lng] })),
+    victims: victims.map(v => ({ cod: v.cod, sex: v.sex, ora: v.ora }))
+  });
+}
+function clearAll(){
+  disarm();
+  placed.forEach(p => map.removeLayer(p.marker)); placed = []; idCounter = 1;
+  eventLayers.forEach(l => map.removeLayer(l)); eventLayers = []; cancelEventZone();
+  deviceLayers.forEach(removeArrow); deviceLayers = []; deviceStartPoint = null;
+  victims = []; victimIdCounter = 1;
+  if(searchMarker){ map.removeLayer(searchMarker); searchMarker = null; }
+  ['ev-name','ev-date','ev-time'].forEach(id => document.getElementById(id).value = '');
+  render(); renderVictims();
+  hintEl.style.display = '';
+}
+function restore(data){
+  clearAll();
+  const ev = data.ev || {};
+  document.getElementById('ev-name').value = ev.name || '';
+  document.getElementById('ev-date').value = ev.date || '';
+  document.getElementById('ev-time').value = ev.time || '';
+  if(data.view) map.setView([data.view.lat, data.view.lng], data.view.zoom);
+  (data.zones || []).forEach(z => createZone(z.pts, z.color, z.label));
+  (data.arrows || []).forEach(a => drawArrow(a.from, a.to, a.color));
+  (data.placed || []).forEach(p => addMarker(p.type, [p.lat, p.lng], p.prov || ''));
+  victims = (data.victims || []).map((v, i) => ({ id: i + 1, cod: v.cod, sex: v.sex || '?', ora: v.ora || '' }));
+  victimIdCounter = victims.length + 1;
+  renderVictims();
+}
+
+/* ================= SALVARE AUTOMATĂ LOCALĂ ================= */
+const AUTOSAVE_KEY = 'sitac_current';
+let lastAutosave = '';
+function autosave(){
+  const s = serialize();
+  if(s === lastAutosave) return;
+  try{ localStorage.setItem(AUTOSAVE_KEY, s); lastAutosave = s; }catch(e){}
+}
+setInterval(autosave, 3000);
+window.addEventListener('beforeunload', autosave);
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') autosave(); });
+
+/* ================= GOOGLE DRIVE (prin Apps Script) ================= */
+function getCfg(){ return lsGet('sitac_cfg', {}); }
+/* EMBEDDED = pagina e servită chiar de Apps Script (google.script.run disponibil) */
+const EMBEDDED = !!(window.google && google.script && google.script.run);
+function driveReady(){ return EMBEDDED || !!driveReady(); }
+function api(params){
+  const c = getCfg();
+  const body = { ...params, key: c.key || '' };
+  if(EMBEDDED){
+    return new Promise((res, rej) => {
+      google.script.run
+        .withSuccessHandler(j => (j && j.ok) ? res(j) : rej(new Error((j && j.error) || 'Eroare server')))
+        .withFailureHandler(e => rej(new Error((e && e.message) || String(e))))
+        .rpc(body);
+    });
+  }
+  if(!c.url) return Promise.reject(new Error('Legătura cu Drive nu e configurată (⚙ Setări).'));
+  return fetch(c.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) })
+    .then(r => r.json())
+    .then(j => { if(!j.ok) throw new Error(j.error || 'Eroare server'); return j; });
+}
+const apiGet = api, apiPost = api;
+
+/* Coada de trimitere: salvările făcute offline pleacă automat în Drive când revine internetul */
+const QUEUE_KEY = 'sitac_queue';
+let flushing = false;
+function getQueue(){ return lsGet(QUEUE_KEY, []); }
+function updateStatus(){
+  const el = document.getElementById('net-status');
+  const n = getQueue().length;
+  el.classList.toggle('off', !navigator.onLine);
+  document.getElementById('net-text').innerHTML = (navigator.onLine ? 'Online' : 'Offline') + (n ? ` · <span class="pend">${n} de trimis</span>` : '');
+  el.title = n ? 'Situații salvate local care vor fi trimise în Drive când există internet' : '';
+}
+async function flushQueue(silent){
+  if(flushing || !navigator.onLine || !driveReady()) { updateStatus(); return 0; }
+  flushing = true;
+  let sent = 0, lastErr = null;
+  let q = getQueue();
+  while(q.length){
+    const it = q[0];
+    try{
+      await apiPost({ action: 'save', name: it.name, json: it.json });
+      q.shift(); lsSet(QUEUE_KEY, q); sent++;
+    }catch(e){ lastErr = e; break; }
+  }
+  flushing = false;
+  updateStatus();
+  if(sent && !silent) toast(`Trimis în Drive: ${sent} ${sent === 1 ? 'situație' : 'situații'}.`);
+  if(lastErr && !silent) toast('Drive: ' + lastErr.message, 5000);
+  return sent;
+}
+window.addEventListener('online', () => { updateStatus(); flushQueue(); fetchWind(); });
+window.addEventListener('offline', updateStatus);
+setInterval(() => flushQueue(true), 60 * 1000);
+
+const btnSave = document.getElementById('btn-save');
+btnSave.addEventListener('click', async () => {
+  const name = document.getElementById('ev-name').value.trim() || 'situatie';
+  const q = getQueue();
+  if(!lsSet(QUEUE_KEY, q.concat([{ name, json: serialize(), ts: Date.now() }]))){
+    toast('Memoria locală e plină — folosește ⚙ › Descarcă situația ca fișier.', 6000); return;
+  }
+  autosave();
+  if(!driveReady()){ updateStatus(); toast('Salvat local. Configurează legătura Drive din ⚙ ca să se trimită automat.', 5000); return; }
+  if(!navigator.onLine){ updateStatus(); toast('Salvat local (offline). Se trimite în Drive când revine internetul.', 4500); return; }
+  btnSave.disabled = true; btnSave.textContent = 'Se trimite...';
+  const sent = await flushQueue(true);
+  btnSave.disabled = false; btnSave.textContent = 'Salvează în Drive';
+  toast(getQueue().length ? 'Salvat local. Trimiterea în Drive a eșuat — se reîncearcă automat.' : `Salvat în Drive (${sent}).`, 4500);
+});
+
+document.getElementById('btn-new').addEventListener('click', () => {
+  if(hasContent() && !confirm('Începi o situație nouă? Situația curentă se pierde dacă nu ai salvat-o.')) return;
+  clearAll(); autosave();
+});
+
+/* Deschidere */
+const loadModal = document.getElementById('load-modal');
+const lmList = document.getElementById('lm-list');
+function fmtDate(ms){
+  const d = new Date(ms);
+  return d.toLocaleDateString('ro-RO') + ' ' + d.toLocaleTimeString('ro-RO', { hour:'2-digit', minute:'2-digit' });
+}
+function confirmReplace(name){
+  return !hasContent() || confirm(`Deschizi „${name}”? Situația curentă nesalvată se pierde.`);
+}
+async function openList(){
+  loadModal.classList.add('open');
+  lmList.innerHTML = '';
+  const q = getQueue();
+  if(q.length){
+    const h = document.createElement('div'); h.className = 'm-note'; h.textContent = 'Salvate local, încă netrimise în Drive:';
+    lmList.appendChild(h);
+    q.slice().reverse().forEach(it => {
+      const row = document.createElement('div'); row.className = 'lm-item';
+      row.innerHTML = `<span class="lm-name"></span><span class="lm-date">${fmtDate(it.ts)}</span>`;
+      row.querySelector('.lm-name').textContent = '⏳ ' + it.name;
+      row.querySelector('.lm-name').addEventListener('click', () => {
+        if(!confirmReplace(it.name)) return;
+        restore(JSON.parse(it.json)); loadModal.classList.remove('open'); toast('Deschis: ' + it.name);
+      });
+      lmList.appendChild(row);
+    });
+  }
+  const box = document.createElement('div'); lmList.appendChild(box);
+  if(!navigator.onLine){ box.innerHTML = '<div class="empty-hint">Offline — lista din Drive nu e disponibilă acum.</div>'; return; }
+  if(!driveReady()){ box.innerHTML = '<div class="empty-hint">Legătura cu Drive nu e configurată (⚙ Setări).</div>'; return; }
+  box.innerHTML = '<div class="empty-hint">Se încarcă lista din Drive...</div>';
+  try{
+    const { files } = await apiGet({ action: 'list' });
+    if(!files.length){ box.innerHTML = '<div class="empty-hint">Nicio situație în Drive încă.</div>'; return; }
+    box.innerHTML = '';
+    files.forEach(f => {
+      const row = document.createElement('div'); row.className = 'lm-item';
+      row.innerHTML = `<span class="lm-name"></span><span class="lm-date">${fmtDate(f.updated)}</span><span class="lm-del" title="Mută în coșul Drive">✕</span>`;
+      row.querySelector('.lm-name').textContent = f.name.replace(/\.json$/, '');
+      row.querySelector('.lm-name').addEventListener('click', async () => {
+        if(!confirmReplace(f.name)) return;
+        try{
+          const { data } = await apiGet({ action: 'load', id: f.id });
+          restore(JSON.parse(data)); loadModal.classList.remove('open'); toast('Deschis: ' + f.name);
+        }catch(e){ toast('Eroare la deschidere: ' + e.message, 5000); }
+      });
+      row.querySelector('.lm-del').addEventListener('click', async () => {
+        if(!confirm(`Muți „${f.name}” în coșul de gunoi din Drive?`)) return;
+        try{ await apiPost({ action: 'delete', id: f.id }); row.remove(); toast('Mutat în coșul Drive.'); }
+        catch(e){ toast('Eroare: ' + e.message, 5000); }
+      });
+      box.appendChild(row);
+    });
+  }catch(e){
+    box.innerHTML = '<div class="empty-hint" style="color:var(--accent)">Eroare: ' + escapeHtml(e.message) + '</div>';
+  }
+}
+document.getElementById('btn-open').addEventListener('click', openList);
+
+/* Import / export fișier */
+const importInput = document.getElementById('import-file');
+document.getElementById('btn-import').addEventListener('click', () => importInput.click());
+importInput.addEventListener('change', () => {
+  const f = importInput.files[0]; if(!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try{
+      if(!confirmReplace(f.name)) return;
+      restore(JSON.parse(rd.result)); loadModal.classList.remove('open'); toast('Importat: ' + f.name);
+    }catch(e){ toast('Fișier invalid.', 4000); }
+    importInput.value = '';
+  };
+  rd.readAsText(f);
+});
+document.getElementById('btn-export').addEventListener('click', () => {
+  const name = (document.getElementById('ev-name').value.trim() || 'situatie').replace(/[\\/:*?"<>|]/g, '_');
+  const d = new Date();
+  const stamp = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + '_' + String(d.getHours()).padStart(2,'0') + '-' + String(d.getMinutes()).padStart(2,'0');
+  const blob = new Blob([serialize()], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = `SITAC_${stamp}_${name}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+});
+
+/* ================= SETĂRI ================= */
+const settingsModal = document.getElementById('settings-modal');
+const cfgMsg = document.getElementById('cfg-msg');
+const tilesMsg = document.getElementById('tiles-msg');
+async function showTileCount(){
+  const n = await TileCache.count();
+  tilesMsg.textContent = n === null ? 'Cache-ul de hartă nu e disponibil în acest browser.' : `Plăci de hartă salvate pe dispozitiv: ${n}.`;
+}
+document.getElementById('btn-settings').addEventListener('click', () => {
+  const c = getCfg();
+  document.getElementById('cfg-url').value = c.url || '';
+  document.getElementById('cfg-key').value = c.key || '';
+  cfgMsg.textContent = '';
+  document.getElementById('cfg-url-wrap').style.display = EMBEDDED ? 'none' : '';
+  document.getElementById('cfg-embedded-note').style.display = EMBEDDED ? '' : 'none';
+  settingsModal.classList.add('open');
+  showTileCount();
+});
+document.getElementById('cfg-save').addEventListener('click', () => {
+  const url = document.getElementById('cfg-url').value.trim();
+  const key = document.getElementById('cfg-key').value.trim();
+  if(!EMBEDDED && url && !/^https:\/\/script\.google\.com\/.+\/exec$/.test(url)){ cfgMsg.textContent = 'Adresa trebuie să înceapă cu https://script.google.com/ și să se termine în /exec.'; return; }
+  lsSet('sitac_cfg', { url, key });
+  cfgMsg.textContent = 'Setări salvate.';
+  flushQueue();
+});
+document.getElementById('cfg-test').addEventListener('click', async () => {
+  lsSet('sitac_cfg', { url: document.getElementById('cfg-url').value.trim(), key: document.getElementById('cfg-key').value.trim() });
+  cfgMsg.textContent = 'Se testează...';
+  try{ const j = await apiGet({ action: 'ping' }); cfgMsg.textContent = `✔ Legătură OK. Situațiile se salvează în folderul Drive „${j.folder}”.`; flushQueue(); }
+  catch(e){ cfgMsg.textContent = '✖ ' + e.message; }
+});
+
+/* Descărcare zonă pentru offline (zoom curent + 2 niveluri, plafonat) */
+const MAX_PREFETCH = 900;
+document.getElementById('tiles-prefetch').addEventListener('click', async () => {
+  if(!navigator.onLine){ tilesMsg.textContent = 'Ai nevoie de internet pentru descărcare.'; return; }
+  const b = map.getBounds(), z0 = map.getZoom(), urls = [];
+  for(let z = z0; z <= Math.min(z0 + 2, 19); z++){
+    const nw = map.project(b.getNorthWest(), z).divideBy(256).floor();
+    const se = map.project(b.getSouthEast(), z).divideBy(256).floor();
+    for(let x = nw.x; x <= se.x; x++) for(let y = nw.y; y <= se.y; y++){
+      TILE_LAYERS.forEach(l => urls.push(L.Util.template(l._url, { z, x, y, s: '' })));
+    }
+  }
+  if(urls.length > MAX_PREFETCH){ tilesMsg.textContent = `Zona e prea mare (${urls.length} plăci). Mărește zoom-ul pe harta și încearcă din nou.`; return; }
+  let done = 0, failed = 0, i = 0;
+  const btn = document.getElementById('tiles-prefetch'); btn.disabled = true;
+  async function worker(){
+    while(i < urls.length){
+      const u = urls[i++];
+      try{ await loadTile(u); }catch(e){ failed++; }
+      done++;
+      if(done % 10 === 0 || done === urls.length) tilesMsg.textContent = `Se descarcă: ${done}/${urls.length}...`;
+    }
+  }
+  await Promise.all(Array.from({ length: 6 }, worker));
+  btn.disabled = false;
+  const n = await TileCache.count();
+  tilesMsg.textContent = `Gata: ${done - failed} plăci pentru zona vizibilă (zoom ${z0}–${Math.min(z0 + 2, 19)})${failed ? `, ${failed} eșuate` : ''}. Total în cache: ${n}.`;
+});
+document.getElementById('tiles-clear').addEventListener('click', async () => {
+  if(!confirm('Ștergi toate plăcile de hartă salvate pentru offline?')) return;
+  await TileCache.clear(); showTileCount();
+});
+
+/* ================= PANOURI PE TELEFON ================= */
+const palEl = document.getElementById('palette'), resEl = document.getElementById('resources');
+document.getElementById('btn-pal').addEventListener('click', () => { resEl.classList.remove('open'); palEl.classList.toggle('open'); });
+document.getElementById('btn-res').addEventListener('click', () => { palEl.classList.remove('open'); resEl.classList.toggle('open'); });
+map.on('movestart', () => { palEl.classList.remove('open'); resEl.classList.remove('open'); });
+
+/* ================= PORNIRE ================= */
+renderPalette();
+render();
+renderVictims();
+updateStatus();
+try{
+  const saved = localStorage.getItem(AUTOSAVE_KEY);
+  if(saved){
+    const data = JSON.parse(saved);
+    const any = (data.placed||[]).length || (data.zones||[]).length || (data.arrows||[]).length || (data.victims||[]).length || (data.ev && data.ev.name);
+    restore(data);
+    lastAutosave = saved;
+    if(any) toast('Situația anterioară a fost restaurată.');
+  }
+}catch(e){}
+flushQueue(true);
+}
+</script>
+</body>
+</html>
